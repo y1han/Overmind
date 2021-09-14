@@ -6,7 +6,7 @@ import {Autonomy, getAutonomyLevel, Mem} from '../memory/Memory';
 import {Pathing} from '../movement/Pathing';
 import {profile} from '../profiler/decorator';
 import {Cartographer} from '../utilities/Cartographer';
-import {maxBy} from '../utilities/utils';
+import {isRoomAvailable, maxBy} from '../utilities/utils';
 import {MAX_OWNED_ROOMS, SHARD3_MAX_OWNED_ROOMS} from '../~settings';
 import {MIN_EXPANSION_DISTANCE} from './ExpansionEvaluator';
 
@@ -23,7 +23,7 @@ interface ExpansionPlannerMemory {
 
 }
 
-const defaultExpansionPlannerMemory: ExpansionPlannerMemory = {};
+const defaultExpansionPlannerMemory: () => ExpansionPlannerMemory = () => ({});
 
 @assimilationLocked
 @profile
@@ -87,7 +87,7 @@ export class ExpansionPlanner implements IExpansionPlanner {
 
 	private getBestExpansionRoomFor(colony: Colony): { roomName: string, score: number } | undefined {
 		const allColonyRooms = _.zipObject(_.map(getAllColonies(),
-											   col => [col.room.name, true])) as { [roomName: string]: boolean };
+												 col => [col.room.name, true])) as { [roomName: string]: boolean };
 		const allOwnedMinerals = _.map(getAllColonies(), col => col.room.mineral!.mineralType) as MineralConstant[];
 		let bestRoom: string = '';
 		let bestScore: number = -Infinity;
@@ -107,13 +107,13 @@ export class ExpansionPlanner implements IExpansionPlanner {
 				}
 				// Are there powerful hostile rooms nearby?
 				const adjacentRooms = Cartographer.findRoomsInRange(roomName, 1);
-				if (_.any(adjacentRooms, roomName => Memory.rooms[roomName][_RM.AVOID])) {
+				if (_.any(adjacentRooms, roomName => Memory.rooms[roomName][RMEM.AVOID])) {
 					continue;
 				}
 				// Reward new minerals and catalyst rooms
-				const mineralType = Memory.rooms[roomName][_RM.MINERAL]
-								  ? Memory.rooms[roomName][_RM.MINERAL]![_RM_MNRL.MINERALTYPE]
-								  : undefined;
+				const mineralType = Memory.rooms[roomName][RMEM.MINERAL]
+									? Memory.rooms[roomName][RMEM.MINERAL]![RMEM_MNRL.MINERALTYPE]
+									: undefined;
 				if (mineralType) {
 					if (!allOwnedMinerals.includes(mineralType)) {
 						score += UNOWNED_MINERAL_BONUS;
@@ -123,7 +123,7 @@ export class ExpansionPlanner implements IExpansionPlanner {
 					}
 				}
 				// Update best choices
-				if (score > bestScore && Game.map.isRoomAvailable(roomName)) {
+				if (score > bestScore && isRoomAvailable(roomName)) {
 					bestScore = score;
 					bestRoom = roomName;
 				}
